@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical } from 'lucide-react';
+import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical, Palette } from 'lucide-react';
 
 interface Item {
   description: string;
@@ -36,6 +36,58 @@ interface Invoice {
   sentDate?: string;
 }
 
+interface Theme {
+  name: string;
+  primary: string;
+  secondary: string;
+  accent: string;
+  bgGradientFrom: string;
+  bgGradientTo: string;
+}
+
+const themes: Record<string, Theme> = {
+  blue: {
+    name: 'Blue & White',
+    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
+    secondary: 'bg-blue-100 text-blue-700',
+    accent: 'border-blue-500 text-blue-600',
+    bgGradientFrom: 'from-blue-50',
+    bgGradientTo: 'to-indigo-100'
+  },
+  brown: {
+    name: 'Brown & White',
+    primary: 'bg-amber-800 hover:bg-amber-900 text-white',
+    secondary: 'bg-amber-100 text-amber-800',
+    accent: 'border-amber-600 text-amber-800',
+    bgGradientFrom: 'from-amber-50',
+    bgGradientTo: 'to-orange-100'
+  },
+  gold: {
+    name: 'Gold & White',
+    primary: 'bg-yellow-600 hover:bg-yellow-700 text-white',
+    secondary: 'bg-yellow-100 text-yellow-700',
+    accent: 'border-yellow-600 text-yellow-700',
+    bgGradientFrom: 'from-yellow-50',
+    bgGradientTo: 'to-amber-100'
+  },
+  black: {
+    name: 'Black & White',
+    primary: 'bg-gray-900 hover:bg-black text-white',
+    secondary: 'bg-gray-100 text-gray-900',
+    accent: 'border-gray-900 text-gray-900',
+    bgGradientFrom: 'from-gray-50',
+    bgGradientTo: 'to-gray-200'
+  },
+  green: {
+    name: 'Nature Green',
+    primary: 'bg-[#176636] hover:bg-[#0f4d26] text-white',
+    secondary: 'bg-[#EAF1C8] text-[#176636]',
+    accent: 'border-[#73B37F] text-[#176636]',
+    bgGradientFrom: 'from-[#EAF1C8]',
+    bgGradientTo: 'to-[#73B37F]/20'
+  }
+};
+
 export default function InvoiceApp() {
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [currentView, setCurrentView] = useState<'list' | 'create' | 'view'>('list');
@@ -44,6 +96,10 @@ export default function InvoiceApp() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showMarkSentModal, setShowMarkSentModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+  const [showThemeSelector, setShowThemeSelector] = useState(false);
+  const [currentTheme, setCurrentTheme] = useState<string>('blue');
+  
+  const theme = themes[currentTheme];
   
   const [formData, setFormData] = useState({
     clientName: '',
@@ -127,7 +183,7 @@ export default function InvoiceApp() {
   const getStatusBadge = (status: string) => {
     const badges: Record<string, { bg: string; text: string; label: string }> = {
       'draft': { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
-      'sent': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Sent' },
+      'sent': { bg: theme.secondary, text: theme.accent.split(' ')[1], label: 'Sent' },
       'partially-paid': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Partially Paid' },
       'paid': { bg: 'bg-green-100', text: 'text-green-700', label: 'Paid' },
       'overdue': { bg: 'bg-red-100', text: 'text-red-700', label: 'Overdue' }
@@ -141,6 +197,11 @@ export default function InvoiceApp() {
   };
 
   const generateInvoicePDF = (invoice: Invoice) => {
+    const primaryColor = currentTheme === 'blue' ? '#2563eb' : 
+                        currentTheme === 'brown' ? '#92400e' :
+                        currentTheme === 'gold' ? '#ca8a04' :
+                        currentTheme === 'black' ? '#111827' : '#176636';
+    
     const invoiceHTML = `
       <!DOCTYPE html>
       <html>
@@ -148,21 +209,21 @@ export default function InvoiceApp() {
         <meta charset="UTF-8">
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-          .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 3px solid #2563eb; padding-bottom: 20px; }
+          .header { display: flex; justify-content: space-between; margin-bottom: 40px; border-bottom: 3px solid ${primaryColor}; padding-bottom: 20px; }
           .logo { max-width: 150px; max-height: 80px; }
           .company-info { text-align: right; }
-          .company-name { font-size: 24px; font-weight: bold; color: #2563eb; margin: 0; }
-          .invoice-title { font-size: 32px; font-weight: bold; color: #2563eb; margin: 30px 0; }
+          .company-name { font-size: 24px; font-weight: bold; color: ${primaryColor}; margin: 0; }
+          .invoice-title { font-size: 32px; font-weight: bold; color: ${primaryColor}; margin: 30px 0; }
           .invoice-details { margin-bottom: 30px; }
           .status-badge { display: inline-block; padding: 5px 15px; border-radius: 15px; font-size: 12px; font-weight: bold; }
           .client-info { background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 30px; }
           table { width: 100%; border-collapse: collapse; margin: 30px 0; }
-          th { background: #2563eb; color: white; padding: 12px; text-align: left; }
+          th { background: ${primaryColor}; color: white; padding: 12px; text-align: left; }
           td { padding: 12px; border-bottom: 1px solid #e5e7eb; }
           .amount { text-align: right; }
           .total-section { text-align: right; margin-top: 30px; }
-          .total-row { font-size: 20px; font-weight: bold; color: #2563eb; margin-top: 10px; }
-          .notes { margin-top: 40px; padding: 20px; background: #f9fafb; border-left: 4px solid #2563eb; }
+          .total-row { font-size: 20px; font-weight: bold; color: ${primaryColor}; margin-top: 10px; }
+          .notes { margin-top: 40px; padding: 20px; background: #f9fafb; border-left: 4px solid ${primaryColor}; }
           .footer { margin-top: 60px; text-align: center; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
         </style>
       </head>
@@ -251,6 +312,11 @@ export default function InvoiceApp() {
   };
 
   const generateReceipt = (invoice: Invoice, payment: Payment) => {
+    const primaryColor = currentTheme === 'blue' ? '#2563eb' : 
+                        currentTheme === 'brown' ? '#92400e' :
+                        currentTheme === 'gold' ? '#ca8a04' :
+                        currentTheme === 'black' ? '#111827' : '#176636';
+    
     const receiptNumber = `REC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(invoice.payments.length).padStart(3, '0')}`;
     
     const receiptHTML = `
@@ -260,13 +326,13 @@ export default function InvoiceApp() {
         <meta charset="UTF-8">
         <style>
           body { font-family: Arial, sans-serif; padding: 40px; color: #333; }
-          .header { background: #2563eb; color: white; padding: 30px; text-align: center; margin-bottom: 30px; }
+          .header { background: ${primaryColor}; color: white; padding: 30px; text-align: center; margin-bottom: 30px; }
           .receipt-title { font-size: 32px; font-weight: bold; margin: 0; }
           .company-info { text-align: center; margin-bottom: 30px; }
           .company-name { font-size: 20px; font-weight: bold; }
           .details { background: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
           .detail-row { display: flex; justify-content: space-between; margin: 10px 0; }
-          .payment-amount { background: #dbeafe; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; color: #2563eb; border-radius: 8px; margin: 30px 0; }
+          .payment-amount { background: #dbeafe; padding: 20px; text-align: center; font-size: 28px; font-weight: bold; color: ${primaryColor}; border-radius: 8px; margin: 30px 0; }
           .footer { text-align: center; margin-top: 60px; color: #6b7280; font-size: 12px; border-top: 1px solid #e5e7eb; padding-top: 20px; }
         </style>
       </head>
@@ -324,7 +390,7 @@ export default function InvoiceApp() {
         </div>
         
         ${payment.notes ? `
-          <div style="margin: 30px 0; padding: 20px; background: #f9fafb; border-left: 4px solid #2563eb;">
+          <div style="margin: 30px 0; padding: 20px; background: #f9fafb; border-left: 4px solid ${primaryColor};">
             <p style="margin: 0 0 10px 0; font-weight: bold;">Payment Notes:</p>
             <p style="margin: 0;">${payment.notes}</p>
           </div>
@@ -489,24 +555,59 @@ export default function InvoiceApp() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-3 sm:p-4 md:p-6">
+    <div className={`min-h-screen bg-gradient-to-br ${theme.bgGradientFrom} ${theme.bgGradientTo} p-3 sm:p-4 md:p-6`}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
-              <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-blue-600">Infusi Technologies Limited</h1>
+              <h1 className={`text-xl sm:text-2xl md:text-3xl font-bold ${theme.accent.split(' ')[1]}`}>
+                Infusi Technologies Limited
+              </h1>
               <p className="text-sm sm:text-base text-gray-600">Invoice Management System</p>
             </div>
-            {currentView !== 'create' && (
-              <button
-                onClick={() => setCurrentView('create')}
-                className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition text-sm sm:text-base"
-              >
-                <Plus className="inline w-4 h-4 mr-2" />
-                New Invoice
-              </button>
-            )}
+            <div className="flex gap-2">
+              {/* Theme Selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowThemeSelector(!showThemeSelector)}
+                  className={`${theme.primary} px-3 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
+                  title="Change Theme"
+                >
+                  <Palette className="w-4 h-4" />
+                </button>
+                {showThemeSelector && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 p-2">
+                    <p className="text-xs font-semibold text-gray-500 uppercase px-2 py-1">Color Theme</p>
+                    {Object.entries(themes).map(([key, t]) => (
+                      <button
+                        key={key}
+                        onClick={() => {
+                          setCurrentTheme(key);
+                          setShowThemeSelector(false);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between ${
+                          currentTheme === key ? 'bg-gray-100' : ''
+                        }`}
+                      >
+                        <span className="text-sm">{t.name}</span>
+                        {currentTheme === key && <CheckCircle className="w-4 h-4 text-green-600" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              
+              {currentView !== 'create' && (
+                <button
+                  onClick={() => setCurrentView('create')}
+                  className={`${theme.primary} px-4 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
+                >
+                  <Plus className="inline w-4 h-4 mr-2" />
+                  New Invoice
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -521,7 +622,7 @@ export default function InvoiceApp() {
                 <p className="text-gray-500 text-base sm:text-lg mb-2">No invoices created yet</p>
                 <button
                   onClick={() => setCurrentView('create')}
-                  className="mt-4 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-2 rounded-lg font-medium transition text-sm sm:text-base"
+                  className={`mt-4 ${theme.primary} px-4 sm:px-6 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
                 >
                   Create Your First Invoice
                 </button>
@@ -543,7 +644,9 @@ export default function InvoiceApp() {
                         <div className="flex justify-between items-start">
                           <div className="flex-1">
                             <div className="flex items-center gap-2 mb-2">
-                              <h3 className="font-bold text-base sm:text-lg text-blue-600">{invoice.invoiceNumber}</h3>
+                              <h3 className={`font-bold text-base sm:text-lg ${theme.accent.split(' ')[1]}`}>
+                                {invoice.invoiceNumber}
+                              </h3>
                               {getStatusBadge(status)}
                             </div>
                             <p className="text-sm sm:text-base text-gray-600">{invoice.clientName}</p>
@@ -612,7 +715,7 @@ export default function InvoiceApp() {
                     type="text"
                     value={formData.clientName}
                     onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className={`w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${currentTheme}-500 focus:border-transparent text-sm sm:text-base`}
                     placeholder="Enter client name"
                   />
                 </div>
@@ -624,7 +727,7 @@ export default function InvoiceApp() {
                     type="email"
                     value={formData.clientEmail}
                     onChange={(e) => setFormData({ ...formData, clientEmail: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                     placeholder="client@example.com"
                   />
                 </div>
@@ -636,7 +739,7 @@ export default function InvoiceApp() {
                     type="text"
                     value={formData.clientAddress}
                     onChange={(e) => setFormData({ ...formData, clientAddress: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                     placeholder="Enter client address"
                   />
                 </div>
@@ -655,7 +758,7 @@ export default function InvoiceApp() {
                     type="date"
                     value={formData.invoiceDate}
                     onChange={(e) => setFormData({ ...formData, invoiceDate: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
                 <div>
@@ -666,7 +769,7 @@ export default function InvoiceApp() {
                     type="date"
                     value={formData.dueDate}
                     onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                   />
                 </div>
               </div>
@@ -678,7 +781,7 @@ export default function InvoiceApp() {
                 <h3 className="text-base sm:text-lg font-semibold text-gray-700">Items/Expenses</h3>
                 <button
                   onClick={addItem}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium transition text-sm sm:text-base"
+                  className={`${theme.primary} px-4 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
                 >
                   <Plus className="inline w-4 h-4 mr-2" />
                   Add Item
@@ -691,7 +794,7 @@ export default function InvoiceApp() {
                     type="text"
                     value={item.description}
                     onChange={(e) => updateItem(index, 'description', e.target.value)}
-                    className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                    className="flex-1 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                     placeholder="e.g., Cost of registering P.O. Box"
                   />
                   <div className="flex gap-2">
@@ -699,7 +802,7 @@ export default function InvoiceApp() {
                       type="number"
                       value={item.amount}
                       onChange={(e) => updateItem(index, 'amount', e.target.value)}
-                      className="flex-1 sm:w-32 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                      className="flex-1 sm:w-32 px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                       placeholder="Amount"
                       step="0.01"
                     />
@@ -730,7 +833,7 @@ export default function InvoiceApp() {
               <textarea
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
+                className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
                 rows={3}
                 placeholder="Add any additional notes or payment terms"
               />
@@ -739,7 +842,7 @@ export default function InvoiceApp() {
             {/* Submit Button */}
             <button
               onClick={saveInvoice}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-lg transition text-sm sm:text-base"
+              className={`w-full ${theme.primary} font-bold py-3 rounded-lg transition text-sm sm:text-base`}
             >
               <CheckCircle className="inline w-4 sm:w-5 h-4 sm:h-5 mr-2" />
               Create Invoice
@@ -747,10 +850,9 @@ export default function InvoiceApp() {
           </div>
         )}
 
-        {/* View Invoice */}
+        {/* View Invoice - continues with same pattern... */}
         {currentView === 'view' && selectedInvoice && (
           <div className="space-y-4 sm:space-y-6">
-            {/* Invoice Header */}
             <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
               <div className="flex justify-between items-start mb-4">
                 <button
@@ -844,7 +946,6 @@ export default function InvoiceApp() {
                 {selectedInvoice.clientEmail && <p className="text-sm text-gray-600">{selectedInvoice.clientEmail}</p>}
               </div>
 
-              {/* Items Table */}
               <div className="mt-6 overflow-x-auto">
                 <table className="w-full">
                   <thead>
@@ -864,7 +965,6 @@ export default function InvoiceApp() {
                 </table>
               </div>
 
-              {/* Totals */}
               <div className="mt-6 flex flex-col items-end space-y-2">
                 <div className="flex justify-between w-full sm:w-64">
                   <span className="text-gray-600">Subtotal:</span>
@@ -891,13 +991,12 @@ export default function InvoiceApp() {
               </div>
 
               {selectedInvoice.notes && (
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border-l-4 border-blue-500">
+                <div className={`mt-6 p-4 ${theme.secondary} rounded-lg ${theme.accent}`}>
                   <h3 className="font-semibold text-gray-700 mb-2">Notes</h3>
                   <p className="text-sm text-gray-600">{selectedInvoice.notes}</p>
                 </div>
               )}
 
-              {/* Action Buttons */}
               <div className="mt-6 flex flex-col sm:flex-row gap-3">
                 <button
                   onClick={() => generateInvoicePDF(selectedInvoice)}
@@ -918,7 +1017,6 @@ export default function InvoiceApp() {
               </div>
             </div>
 
-            {/* Activities */}
             <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
               <h3 className="text-lg font-semibold text-gray-800 mb-4">Activities</h3>
               <p className="text-sm text-gray-500 mb-4">View all actions & payments made on this invoice.</p>
@@ -928,10 +1026,10 @@ export default function InvoiceApp() {
                   <div key={index} className="flex gap-3 p-3 bg-gray-50 rounded-lg">
                     <div className={`p-2 rounded-lg h-fit ${
                       activity.type === 'payment' ? 'bg-green-100' : 
-                      activity.type === 'sent' ? 'bg-blue-100' : 'bg-gray-100'
+                      activity.type === 'sent' ? theme.secondary : 'bg-gray-100'
                     }`}>
                       {activity.type === 'payment' ? <DollarSign className="w-4 h-4 text-green-600" /> :
-                       activity.type === 'sent' ? <Send className="w-4 h-4 text-blue-600" /> :
+                       activity.type === 'sent' ? <Send className={`w-4 h-4 ${theme.accent.split(' ')[1]}`} /> :
                        <FileText className="w-4 h-4 text-gray-600" />}
                     </div>
                     <div className="flex-1">
@@ -976,7 +1074,7 @@ export default function InvoiceApp() {
                     type="date"
                     value={paymentData.paymentDate}
                     onChange={(e) => setPaymentData({ ...paymentData, paymentDate: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2"
                   />
                 </div>
 
@@ -986,7 +1084,7 @@ export default function InvoiceApp() {
                     type="number"
                     value={paymentData.amountPaid}
                     onChange={(e) => setPaymentData({ ...paymentData, amountPaid: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2"
                     placeholder="0.00"
                     step="0.01"
                   />
@@ -997,7 +1095,7 @@ export default function InvoiceApp() {
                   <select
                     value={paymentData.paymentMethod}
                     onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2"
                   >
                     <option value="">Select payment method</option>
                     <option value="Bank Transfer">Bank Transfer</option>
@@ -1013,7 +1111,7 @@ export default function InvoiceApp() {
                   <textarea
                     value={paymentData.notes}
                     onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2"
                     rows={3}
                     placeholder="Add payment notes (optional)"
                   />
@@ -1056,7 +1154,7 @@ export default function InvoiceApp() {
                     type="date"
                     value={sentDate}
                     onChange={(e) => setSentDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2"
                   />
                 </div>
               </div>
@@ -1070,7 +1168,7 @@ export default function InvoiceApp() {
                 </button>
                 <button
                   onClick={markAsSent}
-                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-medium"
+                  className={`flex-1 ${theme.primary} px-4 py-2 rounded-lg font-medium`}
                 >
                   Mark As Sent
                 </button>
