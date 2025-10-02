@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical, Palette } from 'lucide-react';
 
 interface Item {
@@ -36,56 +36,35 @@ interface Invoice {
   sentDate?: string;
 }
 
-interface Theme {
-  name: string;
-  primary: string;
-  secondary: string;
-  accent: string;
-  bgGradientFrom: string;
-  bgGradientTo: string;
-}
-
-const themes: Record<string, Theme> = {
-  blue: {
-    name: 'Blue & White',
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-    secondary: 'bg-blue-100 text-blue-700',
-    accent: 'border-blue-500 text-blue-600',
-    bgGradientFrom: 'from-blue-50',
-    bgGradientTo: 'to-indigo-100'
-  },
-  brown: {
-    name: 'Brown & White',
-    primary: 'bg-amber-800 hover:bg-amber-900 text-white',
-    secondary: 'bg-amber-100 text-amber-800',
-    accent: 'border-amber-600 text-amber-800',
-    bgGradientFrom: 'from-amber-50',
-    bgGradientTo: 'to-orange-100'
-  },
-  gold: {
-    name: 'Gold & White',
-    primary: 'bg-yellow-600 hover:bg-yellow-700 text-white',
-    secondary: 'bg-yellow-100 text-yellow-700',
-    accent: 'border-yellow-600 text-yellow-700',
-    bgGradientFrom: 'from-yellow-50',
-    bgGradientTo: 'to-amber-100'
-  },
-  black: {
-    name: 'Black & White',
-    primary: 'bg-gray-900 hover:bg-black text-white',
-    secondary: 'bg-gray-100 text-gray-900',
-    accent: 'border-gray-900 text-gray-900',
-    bgGradientFrom: 'from-gray-50',
-    bgGradientTo: 'to-gray-200'
-  },
-  green: {
-    name: 'Nature Green',
-    primary: 'bg-[#176636] hover:bg-[#0f4d26] text-white',
-    secondary: 'bg-[#EAF1C8] text-[#176636]',
-    accent: 'border-[#73B37F] text-[#176636]',
-    bgGradientFrom: 'from-[#EAF1C8]',
-    bgGradientTo: 'to-[#73B37F]/20'
-  }
+const colorOptions = {
+  primary: [
+    { name: 'Blue', value: 'blue', classes: 'bg-blue-600 hover:bg-blue-700 text-white', hexCode: '#2563eb' },
+    { name: 'Brown', value: 'brown', classes: 'bg-amber-800 hover:bg-amber-900 text-white', hexCode: '#92400e' },
+    { name: 'Gold', value: 'gold', classes: 'bg-yellow-600 hover:bg-yellow-700 text-white', hexCode: '#ca8a04' },
+    { name: 'Black', value: 'black', classes: 'bg-gray-900 hover:bg-black text-white', hexCode: '#111827' },
+    { name: 'Green', value: 'green', classes: 'bg-[#176636] hover:bg-[#0f4d26] text-white', hexCode: '#176636' }
+  ],
+  secondary: [
+    { name: 'Light Blue', value: 'blue', classes: 'bg-blue-100 text-blue-700', hexCode: '#dbeafe' },
+    { name: 'Light Brown', value: 'brown', classes: 'bg-amber-100 text-amber-800', hexCode: '#fef3c7' },
+    { name: 'Light Gold', value: 'gold', classes: 'bg-yellow-100 text-yellow-700', hexCode: '#fef9c3' },
+    { name: 'Light Gray', value: 'black', classes: 'bg-gray-100 text-gray-900', hexCode: '#f3f4f6' },
+    { name: 'Light Green', value: 'green', classes: 'bg-[#EAF1C8] text-[#176636]', hexCode: '#EAF1C8' }
+  ],
+  accent: [
+    { name: 'Blue', value: 'blue', classes: 'border-blue-500 text-blue-600', hexCode: '#3b82f6' },
+    { name: 'Brown', value: 'brown', classes: 'border-amber-600 text-amber-800', hexCode: '#d97706' },
+    { name: 'Gold', value: 'gold', classes: 'border-yellow-600 text-yellow-700', hexCode: '#ca8a04' },
+    { name: 'Gray', value: 'black', classes: 'border-gray-900 text-gray-900', hexCode: '#111827' },
+    { name: 'Green', value: 'green', classes: 'border-[#73B37F] text-[#176636]', hexCode: '#73B37F' }
+  ],
+  background: [
+    { name: 'Blue', value: 'blue', classes: 'from-blue-50 to-indigo-100', hexCode: '#eff6ff' },
+    { name: 'Brown', value: 'brown', classes: 'from-amber-50 to-orange-100', hexCode: '#fffbeb' },
+    { name: 'Gold', value: 'gold', classes: 'from-yellow-50 to-amber-100', hexCode: '#fefce8' },
+    { name: 'Gray', value: 'black', classes: 'from-gray-50 to-gray-200', hexCode: '#f9fafb' },
+    { name: 'Green', value: 'green', classes: 'from-[#EAF1C8] to-[#73B37F]/20', hexCode: '#EAF1C8' }
+  ]
 };
 
 export default function InvoiceApp() {
@@ -96,10 +75,40 @@ export default function InvoiceApp() {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showMarkSentModal, setShowMarkSentModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
-  const [showThemeSelector, setShowThemeSelector] = useState(false);
-  const [currentTheme, setCurrentTheme] = useState<string>('blue');
+  const [showThemeBuilder, setShowThemeBuilder] = useState(false);
   
-  const theme = themes[currentTheme];
+  // Custom theme state
+  const [customTheme, setCustomTheme] = useState({
+    primary: 'blue',
+    secondary: 'blue',
+    accent: 'blue',
+    background: 'blue'
+  });
+
+  // Load theme from localStorage on mount
+  useEffect(() => {
+    const savedTheme = localStorage.getItem('infusi-theme');
+    if (savedTheme) {
+      setCustomTheme(JSON.parse(savedTheme));
+    }
+  }, []);
+
+  // Save theme to localStorage when it changes
+  useEffect(() => {
+    localStorage.setItem('infusi-theme', JSON.stringify(customTheme));
+  }, [customTheme]);
+
+  const getCurrentClasses = () => {
+    return {
+      primary: colorOptions.primary.find(c => c.value === customTheme.primary)?.classes || colorOptions.primary[0].classes,
+      secondary: colorOptions.secondary.find(c => c.value === customTheme.secondary)?.classes || colorOptions.secondary[0].classes,
+      accent: colorOptions.accent.find(c => c.value === customTheme.accent)?.classes || colorOptions.accent[0].classes,
+      background: colorOptions.background.find(c => c.value === customTheme.background)?.classes || colorOptions.background[0].classes,
+      primaryHex: colorOptions.primary.find(c => c.value === customTheme.primary)?.hexCode || '#2563eb'
+    };
+  };
+
+  const theme = getCurrentClasses();
   
   const [formData, setFormData] = useState({
     clientName: '',
@@ -197,10 +206,7 @@ export default function InvoiceApp() {
   };
 
   const generateInvoicePDF = (invoice: Invoice) => {
-    const primaryColor = currentTheme === 'blue' ? '#2563eb' : 
-                        currentTheme === 'brown' ? '#92400e' :
-                        currentTheme === 'gold' ? '#ca8a04' :
-                        currentTheme === 'black' ? '#111827' : '#176636';
+    const primaryColor = theme.primaryHex;
     
     const invoiceHTML = `
       <!DOCTYPE html>
@@ -312,10 +318,7 @@ export default function InvoiceApp() {
   };
 
   const generateReceipt = (invoice: Invoice, payment: Payment) => {
-    const primaryColor = currentTheme === 'blue' ? '#2563eb' : 
-                        currentTheme === 'brown' ? '#92400e' :
-                        currentTheme === 'gold' ? '#ca8a04' :
-                        currentTheme === 'black' ? '#111827' : '#176636';
+    const primaryColor = theme.primaryHex;
     
     const receiptNumber = `REC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(invoice.payments.length).padStart(3, '0')}`;
     
@@ -555,7 +558,7 @@ export default function InvoiceApp() {
   };
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br ${theme.bgGradientFrom} ${theme.bgGradientTo} p-3 sm:p-4 md:p-6`}>
+    <div className={`min-h-screen bg-gradient-to-br ${theme.background} p-3 sm:p-4 md:p-6`}>
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 mb-4 sm:mb-6">
@@ -567,36 +570,14 @@ export default function InvoiceApp() {
               <p className="text-sm sm:text-base text-gray-600">Invoice Management System</p>
             </div>
             <div className="flex gap-2">
-              {/* Theme Selector */}
-              <div className="relative">
-                <button
-                  onClick={() => setShowThemeSelector(!showThemeSelector)}
-                  className={`${theme.primary} px-3 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
-                  title="Change Theme"
-                >
-                  <Palette className="w-4 h-4" />
-                </button>
-                {showThemeSelector && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-lg shadow-xl border border-gray-200 z-50 p-2">
-                    <p className="text-xs font-semibold text-gray-500 uppercase px-2 py-1">Color Theme</p>
-                    {Object.entries(themes).map(([key, t]) => (
-                      <button
-                        key={key}
-                        onClick={() => {
-                          setCurrentTheme(key);
-                          setShowThemeSelector(false);
-                        }}
-                        className={`w-full text-left px-3 py-2 rounded-lg hover:bg-gray-50 flex items-center justify-between ${
-                          currentTheme === key ? 'bg-gray-100' : ''
-                        }`}
-                      >
-                        <span className="text-sm">{t.name}</span>
-                        {currentTheme === key && <CheckCircle className="w-4 h-4 text-green-600" />}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              {/* Theme Builder Button */}
+              <button
+                onClick={() => setShowThemeBuilder(!showThemeBuilder)}
+                className={`${theme.primary} px-3 py-2 rounded-lg font-medium transition text-sm sm:text-base`}
+                title="Customize Theme"
+              >
+                <Palette className="w-4 h-4" />
+              </button>
               
               {currentView !== 'create' && (
                 <button
@@ -611,6 +592,138 @@ export default function InvoiceApp() {
           </div>
         </div>
 
+        {/* Theme Builder Modal */}
+        {showThemeBuilder && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">Theme Builder</h3>
+                <button onClick={() => setShowThemeBuilder(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <p className="text-sm text-gray-600 mb-6">Mix and match colors to create your perfect theme</p>
+
+              {/* Primary Color */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Primary Color (Buttons & Headers)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {colorOptions.primary.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setCustomTheme({ ...customTheme, primary: color.value })}
+                      className={`${color.classes} px-4 py-3 rounded-lg font-medium transition relative ${
+                        customTheme.primary === color.value ? 'ring-2 ring-offset-2 ring-gray-900' : ''
+                      }`}
+                    >
+                      {color.name}
+                      {customTheme.primary === color.value && (
+                        <CheckCircle className="absolute top-1 right-1 w-4 h-4" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Secondary Color */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Secondary Color (Badges & Highlights)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {colorOptions.secondary.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setCustomTheme({ ...customTheme, secondary: color.value })}
+                      className={`${color.classes} px-4 py-3 rounded-lg font-medium transition relative ${
+                        customTheme.secondary === color.value ? 'ring-2 ring-offset-2 ring-gray-900' : ''
+                      }`}
+                    >
+                      {color.name}
+                      {customTheme.secondary === color.value && (
+                        <CheckCircle className="absolute top-1 right-1 w-4 h-4 text-green-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Accent Color */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Accent Color (Text & Borders)</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {colorOptions.accent.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setCustomTheme({ ...customTheme, accent: color.value })}
+                      className={`border-2 ${color.classes} px-4 py-3 rounded-lg font-medium transition relative ${
+                        customTheme.accent === color.value ? 'ring-2 ring-offset-2 ring-gray-900' : ''
+                      }`}
+                    >
+                      {color.name}
+                      {customTheme.accent === color.value && (
+                        <CheckCircle className="absolute top-1 right-1 w-4 h-4 text-green-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Background */}
+              <div className="mb-6">
+                <label className="block text-sm font-semibold text-gray-700 mb-3">Background Gradient</label>
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                  {colorOptions.background.map((color) => (
+                    <button
+                      key={color.value}
+                      onClick={() => setCustomTheme({ ...customTheme, background: color.value })}
+                      className={`bg-gradient-to-br ${color.classes} px-4 py-3 rounded-lg font-medium transition relative border-2 ${
+                        customTheme.background === color.value ? 'border-gray-900 ring-2 ring-offset-2 ring-gray-900' : 'border-gray-300'
+                      }`}
+                    >
+                      {color.name}
+                      {customTheme.background === color.value && (
+                        <CheckCircle className="absolute top-1 right-1 w-4 h-4 text-green-600" />
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Preview */}
+              <div className="mb-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm font-semibold text-gray-700 mb-3">Preview</p>
+                <div className={`bg-gradient-to-br ${theme.background} p-4 rounded-lg`}>
+                  <h3 className={`text-xl font-bold ${theme.accent.split(' ')[1]} mb-2`}>Sample Invoice Header</h3>
+                  <button className={`${theme.primary} px-4 py-2 rounded-lg text-sm mr-2`}>
+                    Primary Button
+                  </button>
+                  <span className={`${theme.secondary} px-3 py-1 rounded-full text-xs`}>
+                    Secondary Badge
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setCustomTheme({ primary: 'blue', secondary: 'blue', accent: 'blue', background: 'blue' });
+                  }}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Reset to Default
+                </button>
+                <button
+                  onClick={() => setShowThemeBuilder(false)}
+                  className={`flex-1 ${theme.primary} px-4 py-2 rounded-lg font-medium`}
+                >
+                  Apply Theme
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Rest of the app continues the same... */}
         {/* Invoice List View */}
         {currentView === 'list' && (
           <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -715,7 +828,8 @@ export default function InvoiceApp() {
                     type="text"
                     value={formData.clientName}
                     onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
-                    className={`w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-${currentTheme}-500 focus:border-transparent text-sm sm:text-base`}
+                    className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
+                    style={{ '--tw-ring-color': theme.primaryHex } as React.CSSProperties}
                     placeholder="Enter client name"
                   />
                 </div>
