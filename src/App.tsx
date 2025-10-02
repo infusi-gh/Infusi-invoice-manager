@@ -1,16 +1,49 @@
-import React, { useState } from 'react';
-import { Download, Plus, Trash2, FileText, Upload, X, Calendar, DollarSign, CheckCircle, Clock, Send, Eye, Edit, MoreVertical, Receipt } from 'lucide-react';
+import { useState } from 'react';
+import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical } from 'lucide-react';
+
+interface Item {
+  description: string;
+  amount: string;
+}
+
+interface Activity {
+  type: string;
+  description: string;
+  timestamp: string;
+}
+
+interface Payment {
+  paymentDate: string;
+  amountPaid: string;
+  paymentMethod: string;
+  notes: string;
+  recordedAt: string;
+}
+
+interface Invoice {
+  invoiceNumber: string;
+  clientName: string;
+  clientAddress: string;
+  clientEmail: string;
+  invoiceDate: string;
+  dueDate: string;
+  items: Item[];
+  notes: string;
+  total: number;
+  createdAt: string;
+  payments: Payment[];
+  activities: Activity[];
+  sentDate?: string;
+}
 
 export default function InvoiceApp() {
-  const [invoices, setInvoices] = useState([]);
-  const [currentView, setCurrentView] = useState('list'); // 'list', 'create', 'view'
-  const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [logo, setLogo] = useState(null);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  const [currentView, setCurrentView] = useState<'list' | 'create' | 'view'>('list');
+  const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
+  const [logo, setLogo] = useState<string | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [showReceiptModal, setShowReceiptModal] = useState(false);
   const [showMarkSentModal, setShowMarkSentModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
-  const [selectedReceipt, setSelectedReceipt] = useState(null);
   
   const [formData, setFormData] = useState({
     clientName: '',
@@ -37,12 +70,12 @@ export default function InvoiceApp() {
     return `INF-${year}-${String(count).padStart(3, '0')}`;
   };
 
-  const handleLogoUpload = (e) => {
-    const file = e.target.files[0];
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setLogo(reader.result);
+        setLogo(reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -55,12 +88,12 @@ export default function InvoiceApp() {
     });
   };
 
-  const removeItem = (index) => {
+  const removeItem = (index: number) => {
     const newItems = formData.items.filter((_, i) => i !== index);
     setFormData({ ...formData, items: newItems });
   };
 
-  const updateItem = (index, field, value) => {
+  const updateItem = (index: number, field: keyof Item, value: string) => {
     const newItems = [...formData.items];
     newItems[index][field] = value;
     setFormData({ ...formData, items: newItems });
@@ -72,12 +105,12 @@ export default function InvoiceApp() {
     }, 0);
   };
 
-  const calculatePaidAmount = (invoice) => {
+  const calculatePaidAmount = (invoice: Invoice) => {
     if (!invoice.payments) return 0;
     return invoice.payments.reduce((sum, payment) => sum + parseFloat(payment.amountPaid), 0);
   };
 
-  const getInvoiceStatus = (invoice) => {
+  const getInvoiceStatus = (invoice: Invoice) => {
     const total = invoice.total;
     const paid = calculatePaidAmount(invoice);
     const today = new Date();
@@ -91,8 +124,8 @@ export default function InvoiceApp() {
     return 'draft';
   };
 
-  const getStatusBadge = (status) => {
-    const badges = {
+  const getStatusBadge = (status: string) => {
+    const badges: Record<string, { bg: string; text: string; label: string }> = {
       'draft': { bg: 'bg-gray-100', text: 'text-gray-700', label: 'Draft' },
       'sent': { bg: 'bg-blue-100', text: 'text-blue-700', label: 'Sent' },
       'partially-paid': { bg: 'bg-yellow-100', text: 'text-yellow-700', label: 'Partially Paid' },
@@ -107,7 +140,7 @@ export default function InvoiceApp() {
     );
   };
 
-  const generateInvoicePDF = (invoice) => {
+  const generateInvoicePDF = (invoice: Invoice) => {
     const invoiceHTML = `
       <!DOCTYPE html>
       <html>
@@ -217,7 +250,7 @@ export default function InvoiceApp() {
     URL.revokeObjectURL(url);
   };
 
-  const generateReceipt = (invoice, payment) => {
+  const generateReceipt = (invoice: Invoice, payment: Payment) => {
     const receiptNumber = `REC-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${String(invoice.payments.length).padStart(3, '0')}`;
     
     const receiptHTML = `
@@ -323,7 +356,7 @@ export default function InvoiceApp() {
       return;
     }
 
-    const newInvoice = {
+    const newInvoice: Invoice = {
       ...formData,
       invoiceNumber: getNextInvoiceNumber(),
       total: calculateTotal(),
@@ -353,17 +386,19 @@ export default function InvoiceApp() {
   };
 
   const recordPayment = () => {
+    if (!selectedInvoice) return;
+    
     if (!paymentData.amountPaid || !paymentData.paymentMethod) {
       alert('Please fill in payment amount and method');
       return;
     }
 
-    const payment = {
+    const payment: Payment = {
       ...paymentData,
       recordedAt: new Date().toISOString()
     };
 
-    const updatedInvoice = {
+    const updatedInvoice: Invoice = {
       ...selectedInvoice,
       payments: [...(selectedInvoice.payments || []), payment],
       activities: [
@@ -397,7 +432,9 @@ export default function InvoiceApp() {
   };
 
   const markAsSent = () => {
-    const updatedInvoice = {
+    if (!selectedInvoice) return;
+    
+    const updatedInvoice: Invoice = {
       ...selectedInvoice,
       sentDate: sentDate,
       activities: [
@@ -421,6 +458,8 @@ export default function InvoiceApp() {
   };
 
   const deleteInvoice = () => {
+    if (!selectedInvoice) return;
+    
     if (confirm('Are you sure you want to delete this invoice?')) {
       const updatedInvoices = invoices.filter(inv => inv.invoiceNumber !== selectedInvoice.invoiceNumber);
       setInvoices(updatedInvoices);
@@ -430,6 +469,8 @@ export default function InvoiceApp() {
   };
 
   const editInvoice = () => {
+    if (!selectedInvoice) return;
+    
     setFormData({
       clientName: selectedInvoice.clientName,
       clientAddress: selectedInvoice.clientAddress,
@@ -690,7 +731,7 @@ export default function InvoiceApp() {
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
                 className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm sm:text-base"
-                rows="3"
+                rows={3}
                 placeholder="Add any additional notes or payment terms"
               />
             </div>
@@ -907,7 +948,7 @@ export default function InvoiceApp() {
         )}
 
         {/* Payment Modal */}
-        {showPaymentModal && (
+        {showPaymentModal && selectedInvoice && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
@@ -973,7 +1014,7 @@ export default function InvoiceApp() {
                     value={paymentData.notes}
                     onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    rows="3"
+                    rows={3}
                     placeholder="Add payment notes (optional)"
                   />
                 </div>
