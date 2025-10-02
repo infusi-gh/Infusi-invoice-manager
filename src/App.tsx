@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical, Palette } from 'lucide-react';
 
 interface Item {
@@ -76,6 +76,7 @@ export default function InvoiceApp() {
   const [showMarkSentModal, setShowMarkSentModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
   const [showThemeBuilder, setShowThemeBuilder] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   
   // Custom theme state
   const [customTheme, setCustomTheme] = useState({
@@ -85,18 +86,11 @@ export default function InvoiceApp() {
     background: 'blue'
   });
 
-  // Load theme from localStorage on mount
-  useEffect(() => {
-    const savedTheme = localStorage.getItem('infusi-theme');
-    if (savedTheme) {
-      setCustomTheme(JSON.parse(savedTheme));
-    }
-  }, []);
-
-  // Save theme to localStorage when it changes
-  useEffect(() => {
-    localStorage.setItem('infusi-theme', JSON.stringify(customTheme));
-  }, [customTheme]);
+  // Company settings
+  const [companyName, setCompanyName] = useState('Infusi Technologies Limited');
+  const [companyLocation, setCompanyLocation] = useState('Ghana');
+  const [tempCompanyName, setTempCompanyName] = useState('Infusi Technologies Limited');
+  const [tempCompanyLocation, setTempCompanyLocation] = useState('Ghana');
 
   const getCurrentClasses = () => {
     return {
@@ -239,8 +233,8 @@ export default function InvoiceApp() {
             ${logo ? `<img src="${logo}" class="logo" alt="Company Logo">` : ''}
           </div>
           <div class="company-info">
-            <p class="company-name">Infusi Technologies Limited</p>
-            <p style="margin: 5px 0;">Ghana</p>
+            <p class="company-name">${companyName}</p>
+            <p style="margin: 5px 0;">${companyLocation}</p>
           </div>
         </div>
         
@@ -300,7 +294,7 @@ export default function InvoiceApp() {
         
         <div class="footer">
           <p>Thank you for your business!</p>
-          <p>Infusi Technologies Limited</p>
+          <p>${companyName}</p>
         </div>
       </body>
       </html>
@@ -346,8 +340,8 @@ export default function InvoiceApp() {
         
         <div class="company-info">
           ${logo ? `<img src="${logo}" style="max-width: 150px; max-height: 80px; margin-bottom: 15px;" alt="Logo">` : ''}
-          <div class="company-name">Infusi Technologies Limited</div>
-          <div>Ghana</div>
+          <div class="company-name">${companyName}</div>
+          <div>${companyLocation}</div>
         </div>
         
         <div class="details">
@@ -401,7 +395,7 @@ export default function InvoiceApp() {
         
         <div class="footer">
           <p>Thank you for your payment!</p>
-          <p>Infusi Technologies Limited</p>
+          <p>${companyName}</p>
           <p>Generated on ${new Date().toLocaleDateString()}</p>
         </div>
       </body>
@@ -565,11 +559,27 @@ export default function InvoiceApp() {
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
             <div>
               <h1 className={`text-xl sm:text-2xl md:text-3xl font-bold ${theme.accent.split(' ')[1]}`}>
-                Infusi Technologies Limited
+                {companyName}
               </h1>
               <p className="text-sm sm:text-base text-gray-600">Invoice Management System</p>
             </div>
             <div className="flex gap-2">
+              {/* Settings Button */}
+              <button
+                onClick={() => {
+                  setTempCompanyName(companyName);
+                  setTempCompanyLocation(companyLocation);
+                  setShowSettings(true);
+                }}
+                className="bg-gray-600 hover:bg-gray-700 text-white px-3 py-2 rounded-lg font-medium transition text-sm sm:text-base"
+                title="Company Settings"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+              </button>
+              
               {/* Theme Builder Button */}
               <button
                 onClick={() => setShowThemeBuilder(!showThemeBuilder)}
@@ -591,6 +601,67 @@ export default function InvoiceApp() {
             </div>
           </div>
         </div>
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-800">Company Settings</h3>
+                <button onClick={() => setShowSettings(false)} className="text-gray-500 hover:text-gray-700">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Company Name *</label>
+                  <input
+                    type="text"
+                    value={tempCompanyName}
+                    onChange={(e) => setTempCompanyName(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                    placeholder="Enter your company name"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">Location</label>
+                  <input
+                    type="text"
+                    value={tempCompanyLocation}
+                    onChange={(e) => setTempCompanyLocation(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent"
+                    placeholder="e.g., Ghana, Nigeria, etc."
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-3 mt-6">
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (tempCompanyName.trim()) {
+                      setCompanyName(tempCompanyName);
+                      setCompanyLocation(tempCompanyLocation);
+                      setShowSettings(false);
+                    } else {
+                      alert('Company name is required');
+                    }
+                  }}
+                  className={`flex-1 ${theme.primary} px-4 py-2 rounded-lg font-medium`}
+                >
+                  Save Settings
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Theme Builder Modal */}
         {showThemeBuilder && (
@@ -723,7 +794,6 @@ export default function InvoiceApp() {
           </div>
         )}
 
-        {/* Rest of the app continues the same... */}
         {/* Invoice List View */}
         {currentView === 'list' && (
           <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6 md:p-8">
@@ -829,7 +899,6 @@ export default function InvoiceApp() {
                     value={formData.clientName}
                     onChange={(e) => setFormData({ ...formData, clientName: e.target.value })}
                     className="w-full px-3 sm:px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm sm:text-base"
-                    style={{ '--tw-ring-color': theme.primaryHex } as React.CSSProperties}
                     placeholder="Enter client name"
                   />
                 </div>
@@ -964,7 +1033,7 @@ export default function InvoiceApp() {
           </div>
         )}
 
-        {/* View Invoice - continues with same pattern... */}
+        {/* View Invoice */}
         {currentView === 'view' && selectedInvoice && (
           <div className="space-y-4 sm:space-y-6">
             <div className="bg-white rounded-lg shadow-lg p-4 sm:p-6">
