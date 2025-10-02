@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Download, Plus, Trash2, FileText, Upload, X, DollarSign, CheckCircle, Send, Edit, MoreVertical, Palette } from 'lucide-react';
 
 interface Item {
@@ -68,10 +68,20 @@ const colorOptions = {
 };
 
 export default function InvoiceApp() {
-  const [invoices, setInvoices] = useState<Invoice[]>([]);
+  // Load data from localStorage on mount
+  const loadFromStorage = <T,>(key: string, defaultValue: T): T => {
+    try {
+      const item = localStorage.getItem(key);
+      return item ? JSON.parse(item) : defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  };
+
+  const [invoices, setInvoices] = useState<Invoice[]>(() => loadFromStorage('invoices', []));
   const [currentView, setCurrentView] = useState<'list' | 'create' | 'view'>('list');
   const [selectedInvoice, setSelectedInvoice] = useState<Invoice | null>(null);
-  const [logo, setLogo] = useState<string | null>(null);
+  const [logo, setLogo] = useState<string | null>(() => loadFromStorage('logo', null));
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [showMarkSentModal, setShowMarkSentModal] = useState(false);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
@@ -79,18 +89,59 @@ export default function InvoiceApp() {
   const [showSettings, setShowSettings] = useState(false);
   
   // Custom theme state
-  const [customTheme, setCustomTheme] = useState({
+  const [customTheme, setCustomTheme] = useState(() => loadFromStorage('theme', {
     primary: 'blue',
     secondary: 'blue',
     accent: 'blue',
     background: 'blue'
-  });
+  }));
 
   // Company settings
-  const [companyName, setCompanyName] = useState('Infusi Technologies Limited');
-  const [companyLocation, setCompanyLocation] = useState('Ghana');
+  const [companyName, setCompanyName] = useState(() => loadFromStorage('companyName', 'Infusi Technologies Limited'));
+  const [companyLocation, setCompanyLocation] = useState(() => loadFromStorage('companyLocation', 'Ghana'));
   const [tempCompanyName, setTempCompanyName] = useState('Infusi Technologies Limited');
   const [tempCompanyLocation, setTempCompanyLocation] = useState('Ghana');
+
+  // Save to localStorage whenever data changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('invoices', JSON.stringify(invoices));
+    } catch (e) {
+      console.error('Failed to save invoices');
+    }
+  }, [invoices]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('theme', JSON.stringify(customTheme));
+    } catch (e) {
+      console.error('Failed to save theme');
+    }
+  }, [customTheme]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('logo', JSON.stringify(logo));
+    } catch (e) {
+      console.error('Failed to save logo');
+    }
+  }, [logo]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('companyName', JSON.stringify(companyName));
+    } catch (e) {
+      console.error('Failed to save company name');
+    }
+  }, [companyName]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('companyLocation', JSON.stringify(companyLocation));
+    } catch (e) {
+      console.error('Failed to save company location');
+    }
+  }, [companyLocation]);
 
   const getCurrentClasses = () => {
     return {
