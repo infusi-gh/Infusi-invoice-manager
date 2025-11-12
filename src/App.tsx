@@ -10,11 +10,13 @@ const generateUUID = () => {
   });
 };
 
+// UPDATED: Added discount field
 interface Item {
   id: string;
   description: string;
   quantity: number;
   unitPrice: number;
+  discount: number;  // NEW FIELD
   amount: number;
 }
 
@@ -191,7 +193,8 @@ export default function InvoiceApp() {
     clientPhone: '',
     invoiceDate: new Date().toISOString().split('T')[0],
     dueDate: '',
-    items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, amount: 0 }] as Item[],
+    // UPDATED: Added discount: 0 to initial item
+    items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, discount: 0, amount: 0 }] as Item[],
     notes: '',
     terms: 'Payment is due within 30 days',
     taxRate: 0
@@ -223,8 +226,10 @@ export default function InvoiceApp() {
     }
   };
 
-  const calculateItemAmount = (quantity: number, unitPrice: number): number => {
-    return quantity * unitPrice;
+  // UPDATED: Calculate amount with discount
+  const calculateItemAmount = (quantity: number, unitPrice: number, discount: number): number => {
+    const baseAmount = quantity * unitPrice;
+    return baseAmount - discount;
   };
 
   const calculateSubtotal = (): number => {
@@ -241,10 +246,11 @@ export default function InvoiceApp() {
     return subtotal + tax;
   };
 
+  // UPDATED: Add discount: 0 to new items
   const addItem = () => {
     setFormData({
       ...formData,
-      items: [...formData.items, { id: generateUUID(), description: '', quantity: 1, unitPrice: 0, amount: 0 }]
+      items: [...formData.items, { id: generateUUID(), description: '', quantity: 1, unitPrice: 0, discount: 0, amount: 0 }]
     });
   };
 
@@ -255,16 +261,19 @@ export default function InvoiceApp() {
     });
   };
 
+  // UPDATED: Handle discount in calculation
   const updateItem = (id: string, field: keyof Item, value: any) => {
     setFormData({
       ...formData,
       items: formData.items.map(item => {
         if (item.id === id) {
           const updatedItem = { ...item, [field]: value };
-          if (field === 'quantity' || field === 'unitPrice') {
+          // Recalculate amount when quantity, unitPrice, or discount changes
+          if (field === 'quantity' || field === 'unitPrice' || field === 'discount') {
             updatedItem.amount = calculateItemAmount(
               field === 'quantity' ? value : updatedItem.quantity,
-              field === 'unitPrice' ? value : updatedItem.unitPrice
+              field === 'unitPrice' ? value : updatedItem.unitPrice,
+              field === 'discount' ? value : updatedItem.discount
             );
           }
           return updatedItem;
@@ -325,6 +334,7 @@ export default function InvoiceApp() {
     };
 
     setInvoices([...invoices, newInvoice]);
+    // UPDATED: Reset form with discount: 0
     setFormData({
       clientName: '',
       clientAddress: '',
@@ -332,7 +342,7 @@ export default function InvoiceApp() {
       clientPhone: '',
       invoiceDate: new Date().toISOString().split('T')[0],
       dueDate: '',
-      items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, amount: 0 }],
+      items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, discount: 0, amount: 0 }],
       notes: '',
       terms: 'Payment is due within 30 days',
       taxRate: 0
@@ -350,10 +360,19 @@ export default function InvoiceApp() {
       return;
     }
 
-    const payment: Payment = {
+    const amountPaid = parseFloat(paymentData.amountPaid);
+    const currentPaid = calculatePaidAmount(selectedInvoice);
+    const remainingBalance = selectedInvoice.total - currentPaid;
+
+    if (amountPaid > remainingBalance) {
+      alert(`Payment amount exceeds balance due (GH₵ ${remainingBalance.toFixed(2)})`);
+      return;
+    }
+
+    const newPayment: Payment = {
       id: generateUUID(),
       paymentDate: paymentData.paymentDate,
-      amountPaid: parseFloat(paymentData.amountPaid),
+      amountPaid,
       paymentMethod: paymentData.paymentMethod,
       notes: paymentData.notes,
       recordedAt: new Date().toISOString()
@@ -361,17 +380,18 @@ export default function InvoiceApp() {
 
     const updatedInvoice = {
       ...selectedInvoice,
-      payments: [...selectedInvoice.payments, payment],
-      updatedAt: new Date().toISOString(),
+      payments: [...selectedInvoice.payments, newPayment],
       activities: [
         ...selectedInvoice.activities,
         {
           id: generateUUID(),
           type: 'payment' as const,
-          description: `Payment of GH₵ ${payment.amountPaid.toFixed(2)} received via ${payment.paymentMethod}`,
-          timestamp: payment.recordedAt
+          description: `Payment of GH₵ ${amountPaid.toFixed(2)} recorded`,
+          timestamp: new Date().toISOString(),
+          metadata: { amount: amountPaid, method: paymentData.paymentMethod }
         }
-      ]
+      ],
+      updatedAt: new Date().toISOString()
     };
 
     updatedInvoice.status = determineInvoiceStatus(updatedInvoice);
@@ -393,16 +413,16 @@ export default function InvoiceApp() {
     const updatedInvoice = {
       ...selectedInvoice,
       sentDate: sentDate,
-      updatedAt: new Date().toISOString(),
       activities: [
         ...selectedInvoice.activities,
         {
           id: generateUUID(),
           type: 'sent' as const,
-          description: `Invoice sent to ${selectedInvoice.clientName}`,
+          description: `Invoice sent to ${selectedInvoice.clientEmail || selectedInvoice.clientName}`,
           timestamp: new Date().toISOString()
         }
-      ]
+      ],
+      updatedAt: new Date().toISOString()
     };
 
     updatedInvoice.status = determineInvoiceStatus(updatedInvoice);
@@ -412,43 +432,32 @@ export default function InvoiceApp() {
     setShowMarkSentModal(false);
   };
 
-  const deleteInvoice = (id: string) => {
+  const deleteInvoice = () => {
+    if (!selectedInvoice) return;
+    
     if (window.confirm('Are you sure you want to delete this invoice?')) {
-      setInvoices(invoices.filter(inv => inv.id !== id));
-      if (selectedInvoice?.id === id) {
-        setSelectedInvoice(null);
-        setCurrentView('list');
-      }
+      setInvoices(invoices.filter(inv => inv.id !== selectedInvoice.id));
+      setCurrentView('list');
+      setSelectedInvoice(null);
     }
   };
-
 
   const generateInvoiceHTML = (invoice: Invoice) => {
     try {
       const totalPaid = calculatePaidAmount(invoice);
       const balance = invoice.total - totalPaid;
-      
-      // Status badge colors
-      const getStatusColors = (status: InvoiceStatus) => {
-        switch (status) {
-          case 'paid':
-            return { bg: 'bg-green-100', text: 'text-green-800' };
-          case 'partial':
-            return { bg: 'bg-yellow-100', text: 'text-yellow-800' };
-          case 'overdue':
-            return { bg: 'bg-red-100', text: 'text-red-800' };
-          case 'sent':
-            return { bg: 'bg-blue-100', text: 'text-blue-800' };
-          case 'cancelled':
-            return { bg: 'bg-gray-100', text: 'text-gray-600' };
-          default:
-            return { bg: 'bg-gray-100', text: 'text-gray-800' };
-        }
-      };
   
-      const statusColors = getStatusColors(invoice.status);
+      // Determine status colors
+      const statusColors = {
+        draft: { bg: 'bg-gray-100', text: 'text-gray-800' },
+        sent: { bg: 'bg-blue-100', text: 'text-blue-800' },
+        partial: { bg: 'bg-yellow-100', text: 'text-yellow-800' },
+        paid: { bg: 'bg-green-100', text: 'text-green-800' },
+        overdue: { bg: 'bg-red-100', text: 'text-red-800' },
+        cancelled: { bg: 'bg-gray-100', text: 'text-gray-600' }
+      }[invoice.status];
   
-      // Create complete HTML document
+      // UPDATED: Complete HTML document with discount column
       const htmlContent = `
   <!DOCTYPE html>
   <html lang="en">
@@ -483,7 +492,7 @@ export default function InvoiceApp() {
     <div class="bg-white rounded-lg p-8">
       
       <!-- Header Section -->
-      <div class="flex justify-between items-start mb-8">
+      <div class="flex justify-between items-start mb-8 border-b pb-6">
         <!-- Logo and Company Info -->
         <div class="flex items-start gap-4">
           ${logo ? `<img src="${logo}" alt="Logo" class="w-16 h-16 object-contain" />` : ''}
@@ -498,7 +507,7 @@ export default function InvoiceApp() {
         
         <!-- Invoice Title and Status -->
         <div class="text-right">
-          <h2 class="text-4xl font-bold text-blue-600 mb-2">INVOICE</h2>
+          <h2 class="text-4xl font-bold text-gray-800 mb-2">INVOICE</h2>
           <span class="inline-block px-4 py-1 rounded-full text-sm font-semibold ${statusColors.bg} ${statusColors.text}">
             ${invoice.status.toUpperCase()}
           </span>
@@ -506,12 +515,12 @@ export default function InvoiceApp() {
       </div>
   
       <!-- Invoice Details and Bill To -->
-      <div class="grid grid-cols-2 gap-8 mb-8">
-        <!-- Bill To -->
-        <div>
-          <h3 class="text-lg font-semibold text-blue-600 mb-3">Bill To:</h3>
+      <div class="grid grid-cols-2 gap-6 mb-8">
+        <!-- Bill To - UPDATED: Gray background -->
+        <div class="bg-gray-100 p-4 rounded-lg">
+          <h3 class="font-semibold text-gray-700 mb-2">BILL TO</h3>
           <div class="text-gray-800">
-            <p class="font-bold text-lg">${invoice.clientName}</p>
+            <p class="font-medium">${invoice.clientName}</p>
             ${invoice.clientAddress ? `<p class="text-sm text-gray-600">${invoice.clientAddress}</p>` : ''}
             ${invoice.clientEmail ? `<p class="text-sm text-gray-600">${invoice.clientEmail}</p>` : ''}
             ${invoice.clientPhone ? `<p class="text-sm text-gray-600">${invoice.clientPhone}</p>` : ''}
@@ -520,7 +529,7 @@ export default function InvoiceApp() {
   
         <!-- Invoice Details -->
         <div class="text-right">
-          <div class="space-y-2">
+          <div class="space-y-1">
             <div>
               <span class="text-sm text-gray-600">Invoice #:</span>
               <span class="font-semibold text-gray-800 ml-2">${invoice.invoiceNumber}</span>
@@ -537,85 +546,95 @@ export default function InvoiceApp() {
         </div>
       </div>
   
-      <!-- Items Table -->
+      <!-- Items Table - UPDATED: Added Discount Column -->
       <div class="mb-8 overflow-x-auto">
-        <table class="w-full">
-          <thead class="bg-blue-600 text-white">
-            <tr>
-              <th class="text-left p-3 rounded-tl-lg">Description</th>
-              <th class="text-center p-3">Qty</th>
-              <th class="text-right p-3">Unit Price</th>
-              <th class="text-right p-3 rounded-tr-lg">Amount</th>
+        <table class="w-full border-collapse">
+          <thead>
+            <tr class="border-b-2 border-gray-300">
+              <th class="text-left p-3 text-gray-700">Item</th>
+              <th class="text-center p-3 text-gray-700">Quantity</th>
+              <th class="text-right p-3 text-gray-700">Price</th>
+              <th class="text-right p-3 text-gray-700">Discount</th>
+              <th class="text-right p-3 text-gray-700">Amount</th>
             </tr>
           </thead>
           <tbody>
-            ${invoice.items.map((item, index) => `
-              <tr class="${index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}">
+            ${invoice.items.map(item => `
+              <tr class="border-b border-gray-200">
                 <td class="p-3 text-gray-800">${item.description}</td>
                 <td class="p-3 text-center text-gray-800">${item.quantity}</td>
-                <td class="p-3 text-right text-gray-800">GH₵ ${item.unitPrice.toFixed(2)}</td>
-                <td class="p-3 text-right font-medium text-gray-800">GH₵ ${item.amount.toFixed(2)}</td>
+                <td class="p-3 text-right text-gray-800">GH₵${item.unitPrice.toFixed(2)}</td>
+                <td class="p-3 text-right text-gray-800">${item.discount > 0 ? 'GH₵' + item.discount.toFixed(2) : '-'}</td>
+                <td class="p-3 text-right font-medium text-gray-800">GH₵${item.amount.toFixed(2)}</td>
               </tr>
             `).join('')}
           </tbody>
         </table>
       </div>
   
-      <!-- Totals Section -->
-      <div class="flex justify-between items-start mb-8">
-        <!-- Payment Terms -->
-        <div class="max-w-md">
-          ${invoice.terms || invoice.notes ? `
-            <h3 class="text-lg font-semibold text-blue-600 mb-2">Payment Terms</h3>
-            ${invoice.terms ? `<p class="text-sm text-gray-600 mb-2">${invoice.terms}</p>` : ''}
-            ${invoice.notes ? `<p class="text-sm text-gray-600">${invoice.notes}</p>` : ''}
+      <!-- UPDATED: Payment Instructions & Financial Summary Section -->
+      <div class="border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+        <!-- Payment Instructions - Left Side -->
+        ${invoice.terms ? `
+          <div>
+            <h3 class="font-semibold text-gray-700 mb-2">Payment Instruction</h3>
+            <div class="text-sm text-gray-600 whitespace-pre-line">
+              ${invoice.terms}
+            </div>
+          </div>
+        ` : '<div></div>'}
+
+        <!-- Financial Summary - Right Side -->
+        <div class="space-y-2">
+          <!-- Subtotal -->
+          <div class="flex justify-between pb-2">
+            <span class="text-gray-600">Subtotal</span>
+            <span class="font-medium">GH₵${invoice.subtotal.toFixed(2)}</span>
+          </div>
+
+          <!-- Tax -->
+          ${invoice.taxRate > 0 ? `
+            <div class="flex justify-between pb-2">
+              <span class="text-gray-600">Tax (${invoice.taxRate}%)</span>
+              <span class="font-medium">GH₵${invoice.taxAmount.toFixed(2)}</span>
+            </div>
           ` : ''}
-        </div>
-  
-        <!-- Totals -->
-        <div class="w-80">
-          <div class="space-y-3">
-            <!-- Subtotal -->
-            <div class="flex justify-between text-gray-700">
-              <span>Subtotal:</span>
-              <span class="font-medium">GH₵ ${invoice.subtotal.toFixed(2)}</span>
+
+          <!-- Total -->
+          <div class="flex justify-between border-t pt-2 pb-2">
+            <span class="font-bold">Total</span>
+            <span class="font-bold">GH₵${invoice.total.toFixed(2)}</span>
+          </div>
+
+          <!-- Payment Records -->
+          ${invoice.payments.map(payment => `
+            <div class="flex justify-between text-sm">
+              <span class="text-gray-600">Paid on ${new Date(payment.paymentDate).toLocaleDateString()}</span>
+              <span class="font-medium">GH₵${payment.amountPaid.toFixed(2)}</span>
             </div>
-  
-            <!-- Tax -->
-            ${invoice.taxRate > 0 ? `
-              <div class="flex justify-between text-gray-700">
-                <span>Tax (${invoice.taxRate}%):</span>
-                <span class="font-medium">GH₵ ${invoice.taxAmount.toFixed(2)}</span>
-              </div>
-            ` : ''}
-  
-            <!-- Total -->
-            <div class="flex justify-between text-xl font-bold border-t pt-3 text-gray-900">
-              <span>Total:</span>
-              <span>GH₵ ${invoice.total.toFixed(2)}</span>
+          `).join('')}
+
+          <!-- Amount Due - UPDATED: Highlighted in gray box -->
+          <div class="bg-gray-100 p-4 rounded-lg mt-4">
+            <div class="flex justify-between items-center">
+              <span class="text-gray-600 text-sm">Amount Due</span>
+              <span class="text-3xl font-bold text-gray-900">
+                GH₵${balance.toFixed(2)}
+              </span>
             </div>
-  
-            <!-- Amount Paid -->
-            ${totalPaid > 0 ? `
-              <div class="flex justify-between text-green-600 font-medium">
-                <span>Amount Paid:</span>
-                <span>GH₵ ${totalPaid.toFixed(2)}</span>
-              </div>
-            ` : ''}
-  
-            <!-- Balance Due -->
-            ${totalPaid > 0 ? `
-              <div class="flex justify-between text-lg font-bold ${balance > 0 ? 'text-red-600' : 'text-green-600'}">
-                <span>Balance Due:</span>
-                <span>GH₵ ${balance.toFixed(2)}</span>
-              </div>
-            ` : ''}
           </div>
         </div>
       </div>
+
+      ${invoice.notes ? `
+        <div class="mt-6 p-4 bg-gray-50 rounded-lg">
+          <h3 class="font-semibold text-gray-700 mb-2">Notes</h3>
+          <p class="text-sm text-gray-600">${invoice.notes}</p>
+        </div>
+      ` : ''}
   
       <!-- Footer -->
-      <div class="border-t pt-6 text-center text-sm text-gray-500">
+      <div class="border-t pt-6 mt-8 text-center text-sm text-gray-500">
         <p>Thank you for your business!</p>
         <p class="mt-1">Generated on ${new Date().toLocaleDateString()}</p>
       </div>
@@ -770,7 +789,7 @@ export default function InvoiceApp() {
                 clientPhone: '',
                 invoiceDate: new Date().toISOString().split('T')[0],
                 dueDate: '',
-                items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, amount: 0 }],
+                items: [{ id: generateUUID(), description: '', quantity: 1, unitPrice: 0, discount: 0, amount: 0 }],
                 notes: '',
                 terms: 'Payment is due within 30 days',
                 taxRate: 0
@@ -898,16 +917,6 @@ export default function InvoiceApp() {
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Client Address</label>
-                    <input
-                      type="text"
-                      value={formData.clientAddress}
-                      onChange={(e) => setFormData({ ...formData, clientAddress: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                      placeholder="Enter address"
-                    />
-                  </div>
-                  <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Client Phone</label>
                     <input
                       type="tel"
@@ -915,6 +924,16 @@ export default function InvoiceApp() {
                       onChange={(e) => setFormData({ ...formData, clientPhone: e.target.value })}
                       className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                       placeholder="+233 XX XXX XXXX"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Client Address</label>
+                    <input
+                      type="text"
+                      value={formData.clientAddress}
+                      onChange={(e) => setFormData({ ...formData, clientAddress: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                      placeholder="Enter client address"
                     />
                   </div>
                 </div>
@@ -957,7 +976,7 @@ export default function InvoiceApp() {
                 </div>
               </div>
 
-              {/* Items */}
+              {/* Items - UPDATED with Discount Column */}
               <div>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-semibold text-gray-700">Items</h3>
@@ -972,7 +991,7 @@ export default function InvoiceApp() {
                 <div className="space-y-3">
                   {formData.items.map((item) => (
                     <div key={item.id} className="flex gap-2 items-start bg-gray-50 p-4 rounded-lg">
-                      <div className="flex-1 grid grid-cols-1 md:grid-cols-4 gap-2">
+                      <div className="flex-1 grid grid-cols-1 md:grid-cols-5 gap-2">
                         <div className="md:col-span-2">
                           <input
                             type="text"
@@ -1000,6 +1019,18 @@ export default function InvoiceApp() {
                             onChange={(e) => updateItem(item.id, 'unitPrice', parseFloat(e.target.value) || 0)}
                             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
                             placeholder="Price"
+                            step="0.01"
+                            min="0"
+                          />
+                        </div>
+                        {/* NEW: Discount Input */}
+                        <div>
+                          <input
+                            type="number"
+                            value={item.discount}
+                            onChange={(e) => updateItem(item.id, 'discount', parseFloat(e.target.value) || 0)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-sm"
+                            placeholder="Discount"
                             step="0.01"
                             min="0"
                           />
@@ -1104,25 +1135,27 @@ export default function InvoiceApp() {
                     <MoreVertical className="w-5 h-5" />
                   </button>
                   {showActionsMenu && (
-                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 z-10">
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-xl border border-gray-200 z-10">
+                      {!selectedInvoice.sentDate && (
+                        <button
+                          onClick={() => {
+                            setShowMarkSentModal(true);
+                            setShowActionsMenu(false);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center"
+                        >
+                          <Send className="w-4 h-4 mr-2" />
+                          Mark as Sent
+                        </button>
+                      )}
                       <button
                         onClick={() => {
-                          setShowMarkSentModal(true);
+                          deleteInvoice();
                           setShowActionsMenu(false);
                         }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2"
+                        className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center text-red-600"
                       >
-                        <Send className="w-4 h-4" />
-                        Mark as Sent
-                      </button>
-                      <button
-                        onClick={() => {
-                          deleteInvoice(selectedInvoice.id);
-                          setShowActionsMenu(false);
-                        }}
-                        className="w-full text-left px-4 py-2 hover:bg-gray-50 text-red-600 flex items-center gap-2"
-                      >
-                        <Trash2 className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4 mr-2" />
                         Delete Invoice
                       </button>
                     </div>
@@ -1148,9 +1181,10 @@ export default function InvoiceApp() {
                   </div>
                 </div>
 
+                {/* UPDATED: Bill To with gray background */}
                 <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <h3 className="font-semibold text-gray-700 mb-2">Bill To:</h3>
+                  <div className="bg-gray-100 p-4 rounded-lg">
+                    <h3 className="font-semibold text-gray-700 mb-2">BILL TO</h3>
                     <p className="font-medium">{selectedInvoice.clientName}</p>
                     <p className="text-sm text-gray-600">{selectedInvoice.clientAddress}</p>
                     <p className="text-sm text-gray-600">{selectedInvoice.clientEmail}</p>
@@ -1171,73 +1205,91 @@ export default function InvoiceApp() {
                 </div>
               </div>
 
-              {/* Items Table */}
-              <div className="mb-6">
-                <table className="w-full">
-                  <thead className={`${theme.secondary}`}>
-                    <tr>
-                      <th className="text-left p-3 rounded-tl-lg">Description</th>
-                      <th className="text-center p-3">Qty</th>
-                      <th className="text-right p-3">Unit Price</th>
-                      <th className="text-right p-3 rounded-tr-lg">Amount</th>
+              {/* Items Table - UPDATED with Discount Column */}
+              <div className="mb-6 overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-gray-300">
+                      <th className="text-left p-3 text-gray-700">Item</th>
+                      <th className="text-center p-3 text-gray-700">Quantity</th>
+                      <th className="text-right p-3 text-gray-700">Price</th>
+                      <th className="text-right p-3 text-gray-700">Discount</th>
+                      <th className="text-right p-3 text-gray-700">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {selectedInvoice.items.map((item, index) => (
-                      <tr key={item.id} className={index % 2 === 0 ? 'bg-gray-50' : ''}>
+                    {selectedInvoice.items.map((item) => (
+                      <tr key={item.id} className="border-b border-gray-200">
                         <td className="p-3">{item.description}</td>
                         <td className="p-3 text-center">{item.quantity}</td>
-                        <td className="p-3 text-right">GH₵ {item.unitPrice.toFixed(2)}</td>
-                        <td className="p-3 text-right font-medium">GH₵ {item.amount.toFixed(2)}</td>
+                        <td className="p-3 text-right">GH₵{item.unitPrice.toFixed(2)}</td>
+                        <td className="p-3 text-right">
+                          {item.discount > 0 ? `GH₵${item.discount.toFixed(2)}` : '-'}
+                        </td>
+                        <td className="p-3 text-right font-medium">GH₵{item.amount.toFixed(2)}</td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
 
-              {/* Totals */}
-              <div className="border-t pt-4">
-                <div className="space-y-2 max-w-md ml-auto">
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Subtotal:</span>
-                    <span className="font-medium">GH₵ {selectedInvoice.subtotal.toFixed(2)}</span>
+              {/* UPDATED: Financial Summary with Payment Instructions */}
+              <div className="border-t pt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Payment Instructions - Left Side */}
+                {selectedInvoice.terms && (
+                  <div>
+                    <h3 className="font-semibold text-gray-700 mb-2">Payment Instruction</h3>
+                    <div className="text-sm text-gray-600 whitespace-pre-line">
+                      {selectedInvoice.terms}
+                    </div>
                   </div>
+                )}
+
+                {/* Financial Summary - Right Side */}
+                <div className="space-y-2">
+                  <div className="flex justify-between pb-2">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span className="font-medium">GH₵{selectedInvoice.subtotal.toFixed(2)}</span>
+                  </div>
+                  
                   {selectedInvoice.taxRate > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Tax ({selectedInvoice.taxRate}%):</span>
-                      <span className="font-medium">GH₵ {selectedInvoice.taxAmount.toFixed(2)}</span>
+                    <div className="flex justify-between pb-2">
+                      <span className="text-gray-600">Tax ({selectedInvoice.taxRate}%)</span>
+                      <span className="font-medium">GH₵{selectedInvoice.taxAmount.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-xl font-bold border-t pt-2">
-                    <span>Total:</span>
-                    <span>GH₵ {selectedInvoice.total.toFixed(2)}</span>
+                  
+                  <div className="flex justify-between border-t pt-2 pb-2">
+                    <span className="font-bold">Total</span>
+                    <span className="font-bold">GH₵{selectedInvoice.total.toFixed(2)}</span>
                   </div>
-                  {calculatePaidAmount(selectedInvoice) > 0 && (
-                    <>
-                      <div className="flex justify-between text-green-600">
-                        <span>Amount Paid:</span>
-                        <span className="font-medium">GH₵ {calculatePaidAmount(selectedInvoice).toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-lg font-bold text-red-600">
-                        <span>Balance Due:</span>
-                        <span>GH₵ {(selectedInvoice.total - calculatePaidAmount(selectedInvoice)).toFixed(2)}</span>
-                      </div>
-                    </>
-                  )}
+
+                  {/* Payment Records */}
+                  {selectedInvoice.payments.map((payment) => (
+                    <div key={payment.id} className="flex justify-between text-sm">
+                      <span className="text-gray-600">
+                        Paid on {new Date(payment.paymentDate).toLocaleDateString()}
+                      </span>
+                      <span className="font-medium">GH₵{payment.amountPaid.toFixed(2)}</span>
+                    </div>
+                  ))}
+
+                  {/* UPDATED: Amount Due - Highlighted in Gray Box */}
+                  <div className="bg-gray-100 p-4 rounded-lg mt-4">
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-600 text-sm">Amount Due</span>
+                      <span className="text-3xl font-bold text-gray-900">
+                        GH₵{(selectedInvoice.total - calculatePaidAmount(selectedInvoice)).toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
                 </div>
               </div>
 
               {selectedInvoice.notes && (
-                <div className={`mt-6 p-4 ${theme.secondary} rounded-lg`}>
+                <div className="mt-6 p-4 bg-gray-50 rounded-lg">
                   <h3 className="font-semibold text-gray-700 mb-2">Notes</h3>
                   <p className="text-sm text-gray-600">{selectedInvoice.notes}</p>
-                </div>
-              )}
-
-              {selectedInvoice.terms && (
-                <div className="mt-4 p-4 bg-gray-50 rounded-lg">
-                  <h3 className="font-semibold text-gray-700 mb-2">Payment Terms</h3>
-                  <p className="text-sm text-gray-600">{selectedInvoice.terms}</p>
                 </div>
               )}
 
@@ -1357,7 +1409,6 @@ export default function InvoiceApp() {
                     placeholder="0.00"
                     step="0.01"
                     min="0"
-                    max={selectedInvoice.total - calculatePaidAmount(selectedInvoice)}
                   />
                 </div>
 
@@ -1368,11 +1419,11 @@ export default function InvoiceApp() {
                     onChange={(e) => setPaymentData({ ...paymentData, paymentMethod: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   >
-                    <option value="">Select payment method</option>
-                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="">Select method</option>
                     <option value="Cash">Cash</option>
-                    <option value="Cheque">Cheque</option>
                     <option value="Mobile Money">Mobile Money</option>
+                    <option value="Bank Transfer">Bank Transfer</option>
+                    <option value="Check">Check</option>
                     <option value="Credit Card">Credit Card</option>
                     <option value="Other">Other</option>
                   </select>
@@ -1385,7 +1436,7 @@ export default function InvoiceApp() {
                     onChange={(e) => setPaymentData({ ...paymentData, notes: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                     rows={3}
-                    placeholder="Add payment notes (optional)"
+                    placeholder="Add any notes about this payment..."
                   />
                 </div>
               </div>
@@ -1401,8 +1452,8 @@ export default function InvoiceApp() {
                   onClick={recordPayment}
                   className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg font-medium"
                 >
-                  <Save className="inline w-4 h-4 mr-2" />
-                  Save Payment
+                  <DollarSign className="inline w-4 h-4 mr-2" />
+                  Record Payment
                 </button>
               </div>
             </div>
@@ -1414,25 +1465,23 @@ export default function InvoiceApp() {
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-gray-800">Mark As Sent</h3>
+                <h3 className="text-xl font-bold text-gray-800">Mark Invoice as Sent</h3>
                 <button onClick={() => setShowMarkSentModal(false)} className="text-gray-500 hover:text-gray-700">
                   <X className="w-6 h-6" />
                 </button>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Date Sent *</label>
-                  <input
-                    type="date"
-                    value={sentDate}
-                    onChange={(e) => setSentDate(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  />
-                </div>
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sent Date</label>
+                <input
+                  type="date"
+                  value={sentDate}
+                  onChange={(e) => setSentDate(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
 
-              <div className="mt-6 flex gap-3">
+              <div className="flex gap-3">
                 <button
                   onClick={() => setShowMarkSentModal(false)}
                   className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
@@ -1444,7 +1493,7 @@ export default function InvoiceApp() {
                   className={`flex-1 ${theme.primary} px-4 py-2 rounded-lg font-medium`}
                 >
                   <Send className="inline w-4 h-4 mr-2" />
-                  Mark As Sent
+                  Mark as Sent
                 </button>
               </div>
             </div>
@@ -1467,15 +1516,20 @@ export default function InvoiceApp() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">Company Logo</label>
                   <div className="flex items-center gap-4">
                     {logo && <img src={logo} alt="Logo" className="w-16 h-16 object-contain border rounded" />}
-                    <label className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg cursor-pointer">
+                    <label className="px-4 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg cursor-pointer text-sm font-medium">
                       <Upload className="inline w-4 h-4 mr-2" />
-                      {logo ? 'Change Logo' : 'Upload Logo'}
-                      <input type="file" accept="image/*" onChange={handleLogoUpload} className="hidden" />
+                      Upload Logo
+                      <input
+                        type="file"
+                        accept="image/*"
+                        onChange={handleLogoUpload}
+                        className="hidden"
+                      />
                     </label>
                     {logo && (
                       <button
                         onClick={() => setLogo(null)}
-                        className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        className="px-4 py-2 border border-red-300 text-red-600 rounded-lg hover:bg-red-50 text-sm font-medium"
                       >
                         Remove
                       </button>
@@ -1484,7 +1538,7 @@ export default function InvoiceApp() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Company Name *</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Company Name</label>
                   <input
                     type="text"
                     value={tempCompanyName}
